@@ -141,7 +141,7 @@ ssize_t proc_write(struct file *filp, const char __user *buff, unsigned long len
 	
 	profile_pid = (int)simple_strtol(tmp, NULL, 10);
 
-	//set_pprof_callback(pprof_callback);
+	set_pprof_callback(pprof_callback);
 	printk(KERN_INFO "[init_pprof]: callback registered\n");
 
 	printk(KERN_INFO "tgid=%d(%s)", profile_pid, tmp);

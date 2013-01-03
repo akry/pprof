@@ -1,8 +1,0 @@
-linux-*
-test
-*.symvers
-*.order
-*.mod.c
-*.mod.o
-*.o
-*.ko

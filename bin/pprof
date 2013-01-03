@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+[[ -f /proc/pprof ]] || { echo "[ERROR][pprof]: /proc/pprof does not exist. (${LINENO})"; exit 1; }
+
+$@ & echo $! > /proc/pprof

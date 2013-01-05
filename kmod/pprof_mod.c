@@ -57,6 +57,10 @@
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
 
+/*
+ * custom header
+ */
+#include "../include/pprof.h"
 
 /*
  * data structure representing each state change with timestamp
@@ -79,7 +83,7 @@ struct process_struct {
 #define PORT 20000
 
 int profile_pid;
-int netlink_client_pid;
+int pprofd_pid;
 unsigned long total_data_num = 0;
 struct process_struct *ptr[NUM];
 struct proc_dir_entry *proc_entry;
@@ -88,16 +92,13 @@ struct task_struct *kthread;
 /*
  * netlink connection
  */
-#define NETLINK_USER 31
 struct sock *nl_sk = NULL;
 
 void pprof_callback(struct task_struct *);
 
 void pprof_callback(struct task_struct *task)
 {
-	if(task->tgid != profile_pid)
-		return 0;
-	else {
+	if(task->tgid == profile_pid) {
 		printk(KERN_INFO "%d %d %ld", task->pid, task->tgid, task->state);
 
 		// struct process_struct process;
@@ -141,8 +142,8 @@ ssize_t proc_write(struct file *filp, const char __user *buff, unsigned long len
 	
 	profile_pid = (int)simple_strtol(tmp, NULL, 10);
 
-	//set_pprof_callback(pprof_callback);
-	// printk(KERN_INFO "[init_pprof]: callback registered\n");
+	set_pprof_callback(pprof_callback);
+	printk(KERN_INFO "[init_pprof]: callback registered\n");
 
 	printk(KERN_INFO "tgid=%d(%s)", profile_pid, tmp);
 }
@@ -152,14 +153,22 @@ ssize_t proc_read(char *page, char **start, off_t off, int count, int *eof, void
 	return 0;
 }
 
-
-static void hello_nl_recv_msg(struct sk_buff *skb)
+/*
+ * register_pprofd_pid
+ *
+ * NOTE:
+ * 	This function is used only once during the initialization phase,
+ * 	in order to notify the PID of pprofd to this kernel module.
+ */
+static void register_pprofd_pid(struct sk_buff *skb)
 {
+	printk(KERN_INFO "[register_pprofd_pid]: some packet received by the pprof_mod\n");
 	struct nlmsghdr *nlh;
 	nlh=(struct nlmsghdr*)skb->data;
-	netlink_client_pid = nlh->nlmsg_pid; /*pid of sending process */
+	printk(KERN_INFO "[register_pprofd_pid]: extracting the PID of pprofd\n");
+	pprofd_pid = nlh->nlmsg_pid; /*pid of sending process */
 	
-	printk(KERN_INFO "netlink_client_pid = %d\n", netlink_client_pid);
+	printk(KERN_INFO "[register_pprofd_pid]: pprofd_pid = %d\n", pprofd_pid);
 }
 
 static int __init init_pprof(void)
@@ -180,16 +189,18 @@ static int __init init_pprof(void)
 	}
 
 	// create a netlink socket for netlink_client 
-	// nl_sk=netlink_kernel_create(&init_net, NETLINK_USER, 0, hello_nl_recv_msg, NULL, THIS_MODULE);
-	// if(!nl_sk) {
-	// 
-	//     printk(KERN_ALERT "Error creating socket.\n");
-	//     return -10;
-	// 
-	// }
-	// else {
-	// 	printk(KERN_INFO "[init_pprof]: netlink socket for netlink_client is created\n");
-	// }
+	printk(KERN_INFO "[init_pprof]: create a netlink socket in order to know the PID of pprofd\n");
+	nl_sk=netlink_kernel_create(&init_net, NETLINK_PPROF, 0, register_pprofd_pid, NULL, THIS_MODULE);
+	if(!nl_sk) {
+	
+	    printk(KERN_ALERT "Error creating socket.\n");
+		remove_proc_entry("pprof", NULL);
+	    return -10;
+	
+	}
+	else {
+		printk(KERN_INFO "[init_pprof]: netlink socket for pprofd is created\n");
+	}
 
 	return 0;
 }

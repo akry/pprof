@@ -4,3 +4,5 @@ linux-*
 *\.ko*
 *\.mod*
 *\.symvers
+pprofd/pprofd
+pprofd/result.txt
